@@ -1,0 +1,445 @@
+tic
+clc;
+KK=3.4;%invasion threshold.
+tlimit=240;%simulation time up to tlimit
+px=200;py=200; %200*200 squared cell
+patch=px*py;%No of pacthes
+k=4*patch; %no of stages
+ddL=0;% dispersal distance for L and N due to tick movement
+ddA=0;% dispersal distance for A due to tick movement
+ph_L=1;% dispersal distance for L due to host movement
+ph_A=22;% dispersal distance for A due to host movement
+nzero=zeros(4*patch,1)';
+sx=1;sy=1; %initial position(left top)
+StartingPatch=(sy-1)*px+sx; 
+nzero(StartingPatch)=0;
+nzero(StartingPatch+patch)=0;
+nzero(StartingPatch+2*patch)=0;
+nzero(StartingPatch+3*patch)=6; %initial condition for all E,L,N,A
+
+a=0;c=8.65; %Carrying capacity is 150;
+h_L=1*5*3; %(fraction of the patches in the home range that a host visits in one unit of time*
+%h_N=h_L; %number of patches in the home range*density for one patch)
+h_A=1*500*0.0428; %we may want to do some sensitivity analysis on it and decide to change these values based on what we find.
+y=0;
+h_L=h_L*(1-y);
+h_A=h_A*(1-y);
+
+S_E=0.6198; %survival probabilities are same for all 12 months
+S_L=0.5368;
+S_N=0.5698;
+S_A=0.7349;
+
+gammaE=0.5952;
+gammaL=(1).*[0 0 ones(1,6) zeros(1,4)]; %\gamma are not same
+gammaN=(0.7881).*[0 0 0 ones(1,6) zeros(1,3)];
+gammaA=(0.5630).*[ones(1,6) zeros(1,6)];
+
+
+sigmaL=(1-exp(-0.1*h_L)).*[0 0 ones(1,6) zeros(1,4)];
+sigmaN=(1-exp(-0.1*h_L)).*[0 0 0 ones(1,6) zeros(1,3)];
+sigmaA=(1-exp(-2*h_A)).*[ones(1,6) zeros(1,6)];
+
+beta=(2380.564).*[ones(1,6) zeros(1,6)];
+conversion=1;
+
+
+
+
+
+
+       TE=S_E*(1-gammaE);
+       TE1=S_E*(gammaE);
+       TL1=conversion*S_L.*gammaL.*sigmaL;
+       TN1=conversion*S_N.*gammaN.*sigmaN;
+       dd=conversion.*gammaA.*sigmaA;
+       TL=S_L*(1-gammaL.*sigmaL);
+       TN=S_N*(1-gammaN.*sigmaN);
+       TA=S_A*(1-gammaA.*sigmaA);
+       
+
+   m_L15=distance_mat(2,ddL,px,py); %distance_mat function has to be in the directory
+   m_A15=distance_mat(2,ddA,px,py);
+   psi_L15=distance_mat(2,ph_L,px,py);
+   psi_A15=distance_mat(2,ph_A,px,py);
+  
+  
+invasion_temp=ones(patch,12);
+invasion_det=zeros(patch,1,'single');
+InvasionYes1=ones(patch,1,'single');
+aaa=zeros(4*patch,tlimit,'single');
+aaa(:,1)=nzero;
+taaa1=zeros(patch,tlimit);
+ttt=zeros(patch,tlimit);
+%taaa1=zeros(12,patch);
+ 
+  ff1=a.*gammaA.*sigmaA;
+  ff2=c.*gammaA.*sigmaA;
+  ff3=gammaA.*sigmaA;
+  
+  
+  
+for t=1:tlimit
+ %fprintf('Current simulation(T) number is %d\n',t)  
+    jj=mod(t,12);
+    if jj==0
+        jj=12;
+    end
+  
+ff=zeros(length(psi_A15(:,1)),3,'single');
+counter2=1;
+
+for i = 1:px
+    
+   for j = 1:py
+       
+       for ss=max(1,i-ph_A):min(px,i+ph_A)
+           for s=max(1,j-ph_A):min(py,j+ph_A)
+               tmp=sqrt((i-ss)^2+(s-j)^2);
+               if tmp<=ph_A
+                  row=(s-1)*px+ss;
+                  col=(j-1)*px+i;
+                  ff(counter2,1)=row;
+                  ff(counter2,2)=col;
+                  
+                  ff(counter2,3)=(((beta(jj)*(1+ff1(jj)*aaa(3*patch+col,t)))/(1+ff2(jj)*aaa(3*patch+col,t)+a*(ff3(jj)*aaa(3*patch+col,t))^2)));
+                  
+                 counter2=counter2+1;
+               end 
+           end
+       end  
+   end
+end
+
+ ff=sortrows(ff);
+ ff=ff(:,3).*(dd(jj).*psi_A15(:,3));
+ 
+  
+   
+   mask1=mask_mat(psi_A15); %mask_mat function has to be in the directory
+   mask2=mask_mat(m_L15);
+   mask3=mask_mat(psi_L15);
+   mask4=mask_mat(m_A15);
+  
+  
+         
+ 
+     for i=1:patch-1
+         aaa(i,t+1)=TE*aaa(i,t)+ ff(mask1(i):mask1(i+1)-1,1)'*aaa((3*patch+[psi_A15(mask1(i):mask1(i+1)-1,2)]),t);
+         aaa(patch+i,t+1)=TE1*aaa(i,t)+TL(jj)*m_L15(mask2(i):mask2(i+1)-1,3)'*aaa((patch+[m_L15(mask2(i):mask2(i+1)-1,2)]),t);
+         aaa(2*patch+i,t+1)=TL1(jj)*psi_L15(mask3(i):mask3(i+1)-1,3)'*aaa((patch+[psi_L15(mask3(i):mask3(i+1)-1,2)]),t)+TN(jj)*m_L15(mask2(i):mask2(i+1)-1,3)'*aaa((2*patch+[m_L15(mask2(i):mask2(i+1)-1,2)]),t);
+         aaa(3*patch+i,t+1)=TN1(jj)*psi_L15(mask3(i):mask3(i+1)-1,3)'*aaa((2*patch+[psi_L15(mask3(i):mask3(i+1)-1,2)]),t)+TA(jj)*m_A15(mask4(i):mask4(i+1)-1,3)'*aaa((3*patch+[m_A15(mask4(i):mask4(i+1)-1,2)]),t);       
+     end
+              
+         aaa(patch,t+1)=TE*aaa(patch,t)+ff(mask1(patch):length(psi_A15(:,1)),1)'*aaa((3*patch+[psi_A15(mask1(patch):length(psi_A15(:,1)),2)]),t);
+         aaa(patch+patch,t+1)=TE1*aaa(patch,t)+TL(jj)*m_L15(mask2(patch):length(m_L15(:,1)),3)'*aaa((patch+[m_L15(mask2(patch):length(m_L15(:,1)),2)]),t);
+         aaa(2*patch+patch,t+1)=TL1(jj)*psi_L15(mask3(patch):length(psi_L15(:,1)),3)'*aaa((patch+[psi_L15(mask3(patch):length(psi_L15(:,1)),2)]),t)+TN(jj)*m_L15(mask2(patch):length(m_L15(:,1)),3)'*aaa((2*patch+[m_L15(mask2(patch):length(m_L15(:,1)),2)]),t);
+         aaa(3*patch+patch,t+1)=TN1(jj)*psi_L15(mask3(patch):length(psi_L15(:,1)),3)'*aaa((2*patch+[psi_L15(mask3(patch):length(psi_L15(:,1)),2)]),t)+TA(jj)*m_A15(mask4(patch):length(m_A15(:,1)),3)'*aaa((3*patch+[m_A15(mask4(patch):length(m_A15(:,1)),2)]),t);
+        
+       
+     for i = 1:patch
+    taaa1(i, t) = aaa(3 * patch + i, t);
+  end
+    
+
+
+invasion_det = zeros(patch,1); % To store the value of x for each row
+
+for i = 1:patch  % Loop through each row
+    start_idx = 1;
+    end_idx = 12;
+    
+    while end_idx <= tlimit  % Ensure the window stays within bounds
+        window_mean = mean(taaa1(i, start_idx:end_idx)); % Compute mean
+        
+        if window_mean >= 3.4
+            invasion_det(i) = end_idx; % Store the index where condition is met
+            break;
+        else
+            % Shift the window by removing the first element and adding the next
+            start_idx = start_idx + 1;
+            end_idx = end_idx + 1;
+        end
+    end
+end
+if all(invasion_det > 0)
+    fprintf('Invasion detected in all patches. Stopping simulation early at t = %d\n', t);
+    break;
+end
+end
+
+
+
+invasionmap_det=zeros(px,py,'single');
+ for i = 1:px
+   for j = 1:py
+       invasionmap_det(i,j)= invasion_det((j-1)*px+i);
+   end
+ end
+%Carrying_capacity=mean(sum(aaa(2:4,end-11:end)))
+
+max_invasion=max(max(invasionmap_det));
+%sensitivity_i=(max_invasion-153)/();
+
+ 
+
+%Carrying_capacity=mean(sum(aaa(2:4,end-11:end)))
+
+
+w=10;
+invasion_sto=zeros(patch,w,'single');
+tn=zeros(patch,w,tlimit,'single');
+tt=zeros(patch,tlimit);
+
+for y=1:w
+invasion_temp2=ones(patch,12);
+    fprintf('Current simulation number is %d\n',y)
+    n= nzero;
+  
+    nprime=zeros(k,1,'single');
+    nout=zeros(4*patch,tlimit,'single');
+    InvasionYes=ones(patch,1,'single');
+   tn(1,y,1)=nzero(3*patch+1);
+   for t = 2:tlimit
+  
+
+   %fprintf('Current time number is %d\n',t)
+    jj=mod(t,12);
+    if jj==0
+        jj=12;
+    end
+   
+   m_L15=distance_mat(2,ddL,px,py);
+   m_N15=m_L15;
+   m_A15=distance_mat(2,ddA,px,py);
+   
+   psi_L15=distance_mat(2,ph_L,px,py);
+   psi_N15=psi_L15;
+   psi_A15=distance_mat(2,ph_A,px,py); 
+   
+   m_L15(:,3)=m_L15(:,3).*TL(jj);
+   psi_L15(:,3)=psi_L15(:,3).*TL1(jj);
+  
+   psi_L15(:,2)=psi_L15(:,2)+patch;
+   comb1=sortrows([m_L15;psi_L15]);
+   mask2=mask_mat(comb1);
+   comb12=comb1(:,2);
+   comb13=comb1(:,3);
+   m_N15(:,3)=m_N15(:,3).*TN(jj);
+   psi_N15(:,3)=psi_N15(:,3).*TN1(jj);
+   
+   psi_N15(:,2)=psi_N15(:,2)+patch;
+   comb2=sortrows([m_N15;psi_N15]);
+    
+   mask3=mask_mat(comb2);
+   comb22=comb2(:,2);
+   comb23=comb2(:,3);
+   m_A15(:,3)=m_A15(:,3).*TA(jj);
+   m_A15=sortrows(m_A15);
+   mask4=mask_mat(m_A15);
+   m_A152=m_A15(:,2);
+   m_A153=m_A15(:,3);
+   psi_A15(:,3)=psi_A15(:,3).*dd(jj);
+   psi_A15=sortrows(psi_A15);
+   psi_A15=psi_A15(:,3);
+  
+
+   
+ff1=a.*gammaA.*sigmaA;
+ff2=c.*gammaA.*sigmaA;
+ff3=gammaA.*sigmaA;
+
+
+rci=zeros(length(psi_A15),2,'single'); 
+counter2=1;
+for i = 1:px
+    
+   for j = 1:py
+       
+       for ss=max(1,i-ph_A):min(px,i+ph_A)
+           for s=max(1,j-ph_A):min(py,j+ph_A)
+               tmp=sqrt((i-ss)^2+(s-j)^2);
+               if tmp<=ph_A
+                  col=(j-1)*px+i;
+                  row=(s-1)*px+ss;
+                  rci(counter2,1)=row;
+                  rci(counter2,2)=col;
+                  counter2=counter2+1;
+               end 
+           end
+       end  
+   end
+end
+ rci=sortrows(rci);
+ mask5=mask_mat(rci(:,1));
+ rci2=rci(:,2);
+
+
+  tmp8=[patch;2*patch;4*patch+1];
+  tmp9=[patch+comb1(mask2(patch):length(comb1),2);4*patch+1];
+  tmp10=[2*patch+comb2(mask3(patch):length(comb2),2);4*patch+1];
+  tmp11=[3*patch+m_A15(mask4(patch):length(m_A15),2);4*patch+1];
+  tmpc=3*patch+rci(:,1);
+  tmp13=[rci2(mask5(patch):length(rci2))];
+ 
+
+A=[TE;TE1;1-TE-TE1];
+
+B=1-TL(jj)-TL1(jj);
+C=1-TN(jj)-TN1(jj);
+D=1-TA(jj);
+x1=[comb13(mask2(patch):length(comb1));B]';
+x2=[comb23(mask3(patch):length(comb2));C]';
+x3=[m_A153(mask4(patch):length(m_A15));D]';
+x5=(mask5(patch):length(rci));
+
+
+      tmp1=zeros(3,patch);
+      for i = 1:patch
+      tmp1(:,i)=[i;patch+i;4*patch+1];
+      end
+      
+      
+tmp2=cell(1,patch);
+tmp3=cell(1,patch);
+tmp4=cell(1,patch);
+tmp5=cell(1,patch);
+tmp6=cell(1,patch);
+tmp7=cell(1,patch);
+tmp12=cell(1,patch);
+for i=1:patch-1
+tmp2(:,i)={[patch+comb12(mask2(i):mask2(i+1)-1);4*patch+1]};
+tmp3(:,i)={[comb13(mask2(i):mask2(i+1)-1);B]'};
+tmp4(:,i)={[2*patch+comb22(mask3(i):mask3(i+1)-1);4*patch+1]};
+tmp5(:,i)={[comb23(mask3(i):mask3(i+1)-1);C]'};
+tmp6(:,i)={[3*patch+m_A152(mask4(i):mask4(i+1)-1);4*patch+1]};
+tmp7(:,i)={[m_A153(mask4(i):mask4(i+1)-1);D]'};
+tmp12(:,i)={[rci2(mask5(i):mask5(i+1)-1)]};
+end 
+    
+    
+    
+    
+    
+ 
+    
+   nout(:,t)=n;
+   trans1=zeros(k+1,1);
+   trans2=zeros(k+1,1);
+   trans3=zeros(k+1,1);
+   trans4=zeros(k+1,1);
+
+
+   tmpv=nout(tmpc,t);
+   F3=(((beta.*(1+ff1(jj).*tmpv))./(1+ff2(jj).*tmpv+a.*(ff3(jj).*tmpv).^2)));
+   F3=F3.*(psi_A15);
+
+  
+
+ for i = 1:patch-1
+       if nout(i,t)>0
+        trans1(tmp1(:,i))=trans1(tmp1(:,i))+mnrnd (nout(i,t),A')';
+       end 
+       if nout(patch+i,t)>0
+        trans2(tmp2{i})=trans2(tmp2{i})+mnrnd(nout(patch+i,t),tmp3{i})';
+       end
+     if nout(2*patch+i,t)>0
+        trans3(tmp4{i})=trans3(tmp4{i})+mnrnd (nout(2*patch+i,t),tmp5{i})';
+     end
+     if nout(3*patch+i,t)>0
+       trans4(tmp6{i})=trans4(tmp6{i})+mnrnd(nout(3*patch+i,t),tmp7{i})';
+     end
+ end
+  
+ 
+    trans1(tmp8)=trans1(tmp8)+mnrnd (nout(patch,t),A')';
+    trans2(tmp9)=trans2(tmp9)+mnrnd (nout(2*patch,t),x1)';
+    trans3(tmp10)=trans3(tmp10)+mnrnd (nout(3*patch,t),x2)';   
+    trans4(tmp11)=trans4(tmp11)+mnrnd(nout(4*patch,t),x3)';
+    nprime=trans1+trans2+trans3+trans4;
+    nprime=nprime(1:k);
+    
+ for i=1:patch-1
+     if (nout(3*patch+i,t)>0)
+nprime(tmp12{i})=nprime(tmp12{i})+poissrnd(F3(mask5(i):mask5(i+1)-1)*nout(3*patch+i,t))';
+     end
+ end 
+
+   nprime(tmp13) = nprime(tmp13)+poissrnd(F3(x5)*nout(4*patch,t))';
+   n = nprime;
+   
+      for i = 1:patch
+            tn(i, y, t) = nprime((3 * patch + i));
+        end
+
+        % Invasion detection (after at least 12 time steps)
+        if t >= 12
+            for i = 1:patch
+                if invasion_sto(i, y) == 0
+                    start_idx = t - 11;
+                    end_idx = t;
+                    window_mean1 = mean(tn(i, y, start_idx:end_idx));
+                    if window_mean1 >= 3.4
+                        invasion_sto(i, y) = t;  % Store the time of invasion
+                    end
+                end
+            end
+
+            % Stop early if all patches have been invaded
+            if all(invasion_sto(:, y) > 0)
+                %fprintf('All patches invaded in simulation %d by time %d. Stopping early.\n', y, t);
+                break;
+            end
+        end
+    end
+end
+
+
+Map=round(mean(invasion_sto'));
+invasionmap_sto=zeros(px,py);
+ for i = 1:px
+   for j = 1:py
+       invasionmap_sto(i,j)= Map((j-1)*px+i);
+   end
+ end
+ figure(2)
+ heatmap(invasionmap_sto);
+colormap(colorcube(25))
+title('deterministic model heatmap')
+max_invasion=max(max(invasionmap_sto))
+caxis([min(min(invasionmap_sto)) max(max(invasionmap_sto))])
+
+
+
+
+figure(3)
+k = heatmap(invasionmap_det, 'CellLabelColor', 'none');
+k.XDisplayLabels = repmat({''}, 1, size(invasionmap_sto, 2));
+k.YDisplayLabels = repmat({''}, size(invasionmap_sto, 1), 1);
+
+% Set heatmap labels and title
+k.Title = 'Deterministic Heatmap';
+k.XLabel = 'Patch X coordinate';
+k.YLabel = 'Patch Y coordinate';
+
+% Set colormap
+colormap(colorcube(22))
+
+% Set font size
+k.FontSize = 20;
+
+drawnow;
+
+% Add manual label beside vertical colorbar
+annotation('textbox', [0.89, 0.5, 0.05, 0.1], ...  % adjust position as needed
+    'String', 'Invasion time', ...
+    'Rotation', 90, ...
+    'VerticalAlignment', 'middle', ...
+    'HorizontalAlignment', 'center', ...
+    'EdgeColor', 'none', ...
+    'FontSize', 16, ...
+    'FontWeight', 'normal');
+ax = struct(k); 
+ax = ax.Axes;
+ax.XAxis.TickLabelRotation = 0;
+toc
